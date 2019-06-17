@@ -1,9 +1,11 @@
 import os
 from tqdm import tqdm
-
+import scipy
 import keras
 from keras.preprocessing.image import img_to_array, load_img
 import numpy as np
+import skimage
+from skimage.color import rgb2gray
 from skimage.color import lab2rgb, rgb2lab
 
 class CifarGenerator(keras.utils.Sequence):
@@ -11,11 +13,13 @@ class CifarGenerator(keras.utils.Sequence):
     a generator of Cifar dataset
     use 'for' iteration to generate image in batch-manner
     """
-    def __init__(self, img_dir, batch_size, is_training=True, shuffle=True):
+    def __init__(self, img_dir, batch_size, color_space, is_training=True, shuffle=True):
         self.img_dir = img_dir
         self.batch_size = batch_size
         self.shuffle = shuffle
         self._is_training = is_training
+
+        self.color_space = color_space
 
         self._img_names = []
 
@@ -32,7 +36,7 @@ class CifarGenerator(keras.utils.Sequence):
         if self.is_training and self.shuffle:
             np.random.shuffle(self.indexes)
 
-    def __getitem__(self, index):
+    def _get_item_lab(self, index):
         upper_bound = min(self.size, (index + 1) * self.batch_size)
         indexes = self.indexes[index * self.batch_size:upper_bound]
 
@@ -65,6 +69,40 @@ class CifarGenerator(keras.utils.Sequence):
             # infer process return X and filenames
             return X, [self._img_names[index] for index in indexes]
 
+    def _get_item_rgb(self, index):
+        upper_bound = min(self.size, (index + 1) * self.batch_size)
+        indexes = self.indexes[index * self.batch_size:upper_bound]
+
+        images_A = []
+        images_B = []
+        
+        for index in indexes:
+            f_name = self._img_names[index]
+            image_A = scipy.misc.imread(f_name, mode='RGB').astype(np.float)
+            image_B = rgb2gray(image_A)
+        
+            image_A = scipy.misc.imresize(image_A, (self.h, self.w))
+            image_B = scipy.misc.imresize(image_B, (self.h, self.w))
+            
+            # convert gray-scale image to a 3-channel image to fit input shape
+            image_B = np.stack((image_B,)*3, axis=-1)
+                
+            images_A.append(image_A)
+            images_B.append(image_B)
+        
+        # normalization is to bring the values in range [-1.0,1.0]
+        images_A = np.array(images_A)/127.5 - 1.
+        images_B = np.array(images_B)/127.5 - 1.
+        
+        
+        return images_A, images_B
+
+    def __getitem__(self, index):
+        if self.color_space == 'LAB':
+            return self._get_item_lab(index)
+        else:
+            return self._get_item_rgb(index)
+
 
     def _load(self):
         for f_name in tqdm(os.listdir(self.img_dir)):
@@ -86,12 +124,3 @@ class CifarGenerator(keras.utils.Sequence):
         return self._is_training
     
 
-# if __name__ == '__main__':
-#     generator = CifarGenerator(img_dir='./train_samples', batch_size=16, is_training=False)
-#     if generator.is_training:
-#         for x, y in generator:
-#             print(x.shape)      # (batch_size, 32, 32, 1)
-#             print(y.shape)      # (batch_size, 32, 32, 2)
-#     else:
-#         for x, f_names in generator:
-#             print(x.shape)      # (batch_size, 32, 32, 1)
