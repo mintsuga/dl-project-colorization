@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input
+from keras.layers import *
 from keras.optimizers import Adam
 from keras.utils.vis_utils import plot_model
 from keras.models import load_model, save_model

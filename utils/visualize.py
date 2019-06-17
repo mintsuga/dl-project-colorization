@@ -22,6 +22,7 @@ def convert2rgb(x, predicted):
         ret.append(rgb_predicted)
     return ret
 
+
 def write_log(callback, names, logs, batch_cnt):
     for name, value in zip(names, logs):
         summary = tf.Summary()

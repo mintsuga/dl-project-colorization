@@ -15,10 +15,10 @@ import os
 
 from PIL import Image
 from tqdm import tqdm
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 from utils.CONFIG import *
 
-def train_unet(sess):
+def train_unet(sess, use_logs=True):
     print('Start Training UNET model ...')
     KTF.set_session(sess)
 
@@ -30,13 +30,18 @@ def train_unet(sess):
     train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='LAB')
     steps = int(np.ceil(train_generator.size / batch_size))
 
+    tb_callback = TensorBoard(LOG_DIR)
+    tb_callback.set_model(colorizer.get_model())
+
+
     history = colorizer.model.fit_generator(
         generator=train_generator,
         steps_per_epoch=steps,
-        epochs=n_epoch)
+        epochs=n_epoch,
+        callbacks=[tb_callback],)
 
     # save model
-    save_path = 'unet.model'
+    save_path = 'unet_20.model'
 
     print("Serializing network to '{}'...".format(save_path))
     colorizer.save(save_path)
@@ -61,7 +66,7 @@ def save_intermediate_images(batch_i, images_A, images_B, fake_images_A):
     
     generated_image.save(SAVED_DIR + "/cgan_%d.jpg" % batch_i, quality=95)
 
-def train_gan(sess, use_logs=False):
+def train_gan(sess, use_logs=True):
 
     print('Start Training GAN model ...')
     KTF.set_session(sess)
@@ -72,10 +77,15 @@ def train_gan(sess, use_logs=False):
     batch_size = 64
 
     if use_logs:
-        tb_callback = TensorBoard(LOG_DIR)
-        tb_callback.set_model(colorizer.combined)
-
-        print('finish setting up TensorBoard callback, logging to %s' % LOG_DIR)
+        # writer = tf.summary.FileWriter('./logs/gan_loss') 
+        writer_1 = tf.summary.FileWriter("./logs/g_loss")
+        writer_2 = tf.summary.FileWriter("./logs/d_loss")
+         
+        loss_var = tf.Variable(0.0)
+        tf.summary.scalar("loss", loss_var)
+         
+        write_op = tf.summary.merge_all()
+        print('finish setting up TensorBoard logs')
 
     train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='RGB')
     
@@ -100,24 +110,36 @@ def train_gan(sess, use_logs=False):
             
             g_loss = colorizer.combined.train_on_batch([images_A, images_B], [valid, images_A])
 
+            if use_logs:
+                summary = sess.run(write_op, {loss_var: g_loss[0]})
+                writer_1.add_summary(summary, total_cnt)
+                writer_1.flush()
+             
+                # for writer 2
+                summary = sess.run(write_op, {loss_var: d_loss[0]})
+                writer_2.add_summary(summary, total_cnt)
+                writer_2.flush()
+                # summary = tf.Summary(value=[
+                #         tf.Summary.Value(tag='d_loss', simple_value=d_loss[0]), 
+                #         tf.Summary.Value(tag='g_loss', simple_value=g_loss[0]),
+                #         ]) 
+                # writer.add_summary(summary, total_cnt) 
+
             # record loss every 100 steps
             if total_cnt and not total_cnt % 100:
-                if use_logs:
-                    write_log(tb_callback, ['g_loss, d_loss, acc'], [g_loss[0], d_loss[0], 100*d_loss[1]], total_cnt)
-                
                 print ("[Batch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f]" % 
                                (total_cnt+1, (epoch_cnt+1)*len(train_generator), 
                                 d_loss[0], 100*d_loss[1], g_loss[0]))
                 
                 # save intermediate samples to see gan effects
-                save_intermediate_images(total_cnt, images_A, images_B, fake_A)
+                # save_intermediate_images(total_cnt, images_A, images_B, fake_A)
 
             
         # display loss for every epoch
         print('End of epoch [%d]. loss of gan: %f, loss of discriminator: %f' % (epoch_cnt, g_loss[0], d_loss[0]))
 
-    colorizer.generator.save_weights('g_weights_20.h5')
-    colorizer.discriminator.save_weights('d_weights_20.h5')
+    # colorizer.generator.save_weights('g_weights_20.h5')
+    # colorizer.discriminator.save_weights('d_weights_20.h5')
     
 
 if __name__ == '__main__':
@@ -127,6 +149,6 @@ if __name__ == '__main__':
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
 
-    train_gan(sess, use_logs=True)
+    train_gan(sess)
     # train_unet(sess)
     
