@@ -41,7 +41,7 @@ def train_unet(sess, use_logs=True):
         callbacks=[tb_callback],)
 
     # save model
-    save_path = 'unet_20.model'
+    save_path = 'unet_%d.model' % n_epoch
 
     print("Serializing network to '{}'...".format(save_path))
     colorizer.save(save_path)
@@ -119,6 +119,7 @@ def train_gan(sess, use_logs=True):
                 summary = sess.run(write_op, {loss_var: d_loss[0]})
                 writer_2.add_summary(summary, total_cnt)
                 writer_2.flush()
+
                 # summary = tf.Summary(value=[
                 #         tf.Summary.Value(tag='d_loss', simple_value=d_loss[0]), 
                 #         tf.Summary.Value(tag='g_loss', simple_value=g_loss[0]),
@@ -132,14 +133,14 @@ def train_gan(sess, use_logs=True):
                                 d_loss[0], 100*d_loss[1], g_loss[0]))
                 
                 # save intermediate samples to see gan effects
-                # save_intermediate_images(total_cnt, images_A, images_B, fake_A)
+                save_intermediate_images(total_cnt, images_A, images_B, fake_A)
 
             
         # display loss for every epoch
         print('End of epoch [%d]. loss of gan: %f, loss of discriminator: %f' % (epoch_cnt, g_loss[0], d_loss[0]))
 
-    # colorizer.generator.save_weights('g_weights_20.h5')
-    # colorizer.discriminator.save_weights('d_weights_20.h5')
+    colorizer.generator.save_weights('g_weights_%d.h5' % n_epoch)
+    colorizer.discriminator.save_weights('d_weights_%d.h5' % n_epoch)
     
 
 if __name__ == '__main__':
