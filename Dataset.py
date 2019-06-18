@@ -17,6 +17,8 @@ class CifarGenerator(keras.utils.Sequence):
         self.img_dir = img_dir
         self.batch_size = batch_size
         self.shuffle = shuffle
+
+        # this param is not used in experiments
         self._is_training = is_training
 
         self.color_space = color_space
