@@ -2,15 +2,25 @@
 2019 deep learning final project
 
 ### 模型
-models目录下提供了两种模型，一个是直接使用unet不用GAN，另一个是使用conditional GAN，conditional GAN的generator也使用了unet的结构，discriminator接受一个condition图像来判断生成图像是fake还是real，discriminatory是一个四层的卷积网络（without pooling），最后输出一个标量的validation值，表示生成图像fake/real的程度。
+models目录下提供了五种模型，分别是：auto-encoder模型，unet模型，fusion_with_resnet_classifier模型，fusion_with_label模型，和GAN模型。
+
+auto-encoder模型采用简单的encoder-decoder结构，利用两层卷积和两层反卷积实现黑白图像到彩色的转换；
+
+unet模型采用unet结构来实现转换过程；
+
+fusion_with_resnet_classifier模型参考了2017年论文《Deep-Koalarization: Image Colorization using CNNs and Inception-ResNet-v2 》的思想，利用在ImageNet上预训练好的resnet分类器将灰度图片的分类作为先验知识输入卷积网络；
+
+fusion_with_label模型则是直接将已经知道的cifar-10数据类别(共10类)作为先验知识输入网络；
+
+GAN模型使用conditional GAN，conditional GAN的generator也使用了unet的结构，discriminator接受一个condition图像来判断生成图像是fake还是real，discriminatory是一个四层的卷积网络（without pooling），最后输出一个标量的validation值，表示生成图像fake/real的程度。
 
 #### 训练
 
-两种模型的训练均在train.py中，分别为train_gan(sess)和train_unet(sess)；
+五种模型的训练均在train.py中，可以通过命令行输入['unet', 'autoencoder','fusion_label','fusion_resnet','gan']来区分训练的模型。例如输入python3 train.py -m unet即可利用unet模型进行训练。
 
-use_logs参数用来控制tensorboard记录loss，unet模型使用Keras的fit_generator接口，tensorboard每完成一个epoch通过callback记录一次；而cgan则是每个step通过tf.summary的接口手动写入；
+use_logs参数用来控制tensorboard记录loss，除cgan外的所有模型模型均使用Keras的fit_generator接口，tensorboard每完成一个epoch通过callback记录一次；而cgan则是每个step通过tf.summary的接口手动写入；
 
-通过运行tensorboard --logdir='./logs'可以查看loss
+项目为每个模型建立一个存放loss记录的文件夹，通过运行tensorboard --logdir='./logs/模型名称'可以查看不同模型的loss
 
 ![unet loss](./results/unet_loss.png) 
 
@@ -38,7 +48,9 @@ d_loss_fake = colorizer.discriminator.train_on_batch([fake_A, images_B], fake)
 对于每次迭代返回的X和Y，LAB编码会分别得到shape为(batch_size, 32, 32, 1), (batch_size, 32, 32, 2)的数据，x表示lightness通道，y表示剩下的两个通道；
 而RGB得到的都是(batch_size, 32, 32, 3)的，但是y是灰度图，x是原始彩色图。
 
-实际实验时unet模型使用的是LAB编码，而cgan则采用了RGB编码
+实际实验时，除cgan以外的模型使用的是LAB编码，而cgan则采用了RGB编码
+
+对于fusion模型，CifarGenerator在用LAB编码产生训练数据的同时，还增加了先验知识的输入：其中Resnet模型利用了在ImageNet预训练的Inception-ResNet-v2模型，其对于每组图片输出图片的分类，是1000维的向量，将该向量和图片一起输入训练网络；Label模型将图片和其在cifar中的定义类别(10维向量)一同输入训练网络，其中类别通过每个图片的文件名获知。
 
 #### 关于LAB编码
 对图片进行编码不是用RGB color space而是用的LAB color space. LAB第一个通道其实就是灰度图，使用LAB通道进行网络训练时，输入的是lightness channel，即tensor shape为(batch_size, width, height, 1)；输出为剩下的两个channel，即tensor shape为(batch_size, width, height, 2)
