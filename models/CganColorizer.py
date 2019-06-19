@@ -28,6 +28,7 @@ class CganColorizer():
         
         self.valid = self.discriminator([self.fake_A, self.image_B])
         self.combined = Model(inputs=[self.image_A, self.image_B], outputs=[self.valid, self.fake_A])
+        
         self.combined.compile(loss=['mse', 'mae'], loss_weights=[1, 100], optimizer=Adam(0.0002, 0.5))
         
         self.disc_patch = (int(self.h/2**4), int(self.w/2**4), 1)

@@ -18,6 +18,8 @@ from tqdm import tqdm
 os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 from utils.CONFIG import *
 
+SAVED_DIR = './cgan_samples'
+
 def train_unet(sess, use_logs=True):
     print('Start Training UNET model ...')
     KTF.set_session(sess)
@@ -73,7 +75,7 @@ def train_gan(sess, use_logs=True):
 
     colorizer = CganColorizer()
     
-    n_epoch = 20
+    n_epoch = 50
     batch_size = 64
 
     if use_logs:
@@ -88,6 +90,7 @@ def train_gan(sess, use_logs=True):
         print('finish setting up TensorBoard logs')
 
     train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='RGB')
+    test_generator = CifarGenerator(img_dir=TEST_DIR, batch_size=16, color_space='RGB')
     
     for epoch_cnt in range(n_epoch):
         print('Epoch %d: ' % epoch_cnt)
@@ -126,22 +129,22 @@ def train_gan(sess, use_logs=True):
                 #         ]) 
                 # writer.add_summary(summary, total_cnt) 
 
-            # record loss every 100 steps
-            if total_cnt and not total_cnt % 100:
+            # record loss every 200 steps
+            if total_cnt and not total_cnt % 200:
                 print ("[Batch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f]" % 
                                (total_cnt+1, (epoch_cnt+1)*len(train_generator), 
                                 d_loss[0], 100*d_loss[1], g_loss[0]))
-                
-                # save intermediate samples to see gan effects
-                save_intermediate_images(total_cnt, images_A, images_B, fake_A)
-
+                if not total_cnt % 1000:
+                    test_A, test_B = test_generator[0]
+                    fake_test_A = colorizer.generator.predict(test_B)
+                    # save intermediate samples to see gan effects
+                    save_intermediate_images(total_cnt, test_A, test_B, fake_test_A)
             
         # display loss for every epoch
         print('End of epoch [%d]. loss of gan: %f, loss of discriminator: %f' % (epoch_cnt, g_loss[0], d_loss[0]))
 
     colorizer.generator.save_weights('g_weights_%d.h5' % n_epoch)
     colorizer.discriminator.save_weights('d_weights_%d.h5' % n_epoch)
-    
 
 if __name__ == '__main__':
 
