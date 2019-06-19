@@ -1,8 +1,8 @@
 # TRAIN_DIR = '/data_service/source_datasets/cifar_images/images_train'
-TEST_DIR = '/data_service/source_datasets/cifar_images/images_test_black'
+#TEST_DIR = '/data_service/source_datasets/cifar_images/images_test_black'
 
-TRAIN_DIR = './data/train'
-TEST_DIR = './data/test'
+TRAIN_DIR = './cifar/images_train'
+TEST_DIR = './data/images_test'
 
 
 TEST_RES_DIR = './test_res'

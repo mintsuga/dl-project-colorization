@@ -2,6 +2,9 @@ from Dataset import CifarGenerator
 
 from models.CganColorizer import CganColorizer
 from models.UnetColorizer import UnetColorizer, unet
+from models.AutoEncoderColorizer import AutoEncoderColorizer, AutoEncoder
+from models.LabelFusionColorizer import LabelFusionColorizer, LabelFusionModel
+from models.ResnetFusionColorizer import ResnetFusionColorizer, ResnetFusionModel
 
 from keras.callbacks import TensorBoard
 from utils.visualize import write_log
@@ -15,22 +18,36 @@ import os
 
 from PIL import Image
 from tqdm import tqdm
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from utils.CONFIG import *
 
-def train_unet(sess, use_logs=True):
-    print('Start Training UNET model ...')
+import argparse
+
+def train_net(sess,model_name, use_logs=True):
+    print('Start Training '+ model_name +' model ...')
     KTF.set_session(sess)
 
-    colorizer = UnetColorizer(model=unet(1, 2))
+    n_epoch = 5
+    batch_size = 32
 
-    n_epoch = 20
-    batch_size = 64
+    if model_name == 'unet':
+        colorizer = UnetColorizer(model=unet(1, 2))
+        train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='LAB')
+    elif model_name == 'autoencoder':
+        colorizer = AutoEncoderColorizer(model = AutoEncoder() )
+        train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='LAB')
+    elif model_name == 'fusion_label':
+        colorizer = LabelFusionColorizer(model = LabelFusionModel() )
+        train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='fusion')
+    elif model_name == 'fusion_resnet':
+        colorizer = ResnetFusionColorizer(model = ResnetFusionModel() )
+        train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='fusion_resnet')
 
-    train_generator = CifarGenerator(img_dir=TRAIN_DIR, batch_size=batch_size, color_space='LAB')
+    
     steps = int(np.ceil(train_generator.size / batch_size))
 
-    tb_callback = TensorBoard(LOG_DIR)
+    log_dir_net = LOG_DIR + '/' + model_name
+    tb_callback = TensorBoard(log_dir_net)
     tb_callback.set_model(colorizer.get_model())
 
 
@@ -41,7 +58,7 @@ def train_unet(sess, use_logs=True):
         callbacks=[tb_callback],)
 
     # save model
-    save_path = 'unet_%d.model' % n_epoch
+    save_path = model_name + '_%d.model' % n_epoch
 
     print("Serializing network to '{}'...".format(save_path))
     colorizer.save(save_path)
@@ -145,11 +162,29 @@ def train_gan(sess, use_logs=True):
 
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--model', dest='model')
+    args = parser.parse_args()
+
+    assert args.model in ['unet', 'autoencoder','fusion_label','fusion_resnet','gan']
+
     # gpu config
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
 
-    train_gan(sess)
-    # train_unet(sess)
+    if args.model == 'unet':
+        train_net(sess,'unet')
+    elif args.model == 'autoencoder':
+        train_net(sess,'autoencoder')
+    elif args.model == 'fusion_label':
+        train_net(sess,'fusion')
+    elif args.model == 'fusion_resnet':
+        train_net(sess,'fusion_resnet')
+    elif args.model == 'gan':
+        train_gan(sess)
+
+    else:
+        raise("Invalid model name")
+
     
